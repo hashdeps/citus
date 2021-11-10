@@ -24,6 +24,7 @@ from docopt import docopt
 import utils
 from utils import USER
 import atexit
+import re
 import subprocess
 
 import common
@@ -56,7 +57,24 @@ def perform_postgres_upgrade(
                 "--new-datadir",
                 abs_new_data_path,
             ]
-            subprocess.run(command, check=True)
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+
+            print(out.decode())
+
+            if proc.returncode != 0:
+                # print pg_upgrade_dump_xxxx.log if it exists
+                match = re.search('Consult the last few lines of "(pg_upgrade_dump_[0-9]+\.log)"', out.decode())
+                if match is not None:
+                    upgrade_log_fname = match.group(1)
+                    print(f'Content of "{upgrade_log_fname}" was:')
+                    with open(os.path.join(base_new_data_path, upgrade_log_fname)) as f:
+                        lines = f.readlines()
+                        for line in lines:
+                            print(line, end='')
+
+                sys.exit(proc.returncode)
+
 
 
 def citus_finish_pg_upgrade(pg_path, node_ports):
