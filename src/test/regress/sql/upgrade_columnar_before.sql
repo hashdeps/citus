@@ -1,3 +1,21 @@
+-- To avoid adding another alternative output for upgrade_list_citus_objects,
+-- let's run following three DDL's regardless of which postgres version we
+-- are using.
+
+-- Test if relying on topological sort of the objects, not their names, works
+-- fine where re-creating objects during pg_upgrade.
+ALTER SCHEMA public RENAME TO citus_schema;
+SET search_path TO citus_schema;
+
+-- As mentioned in https://github.com/citusdata/citus/issues/5447, it
+-- is essential to already have public schema to be able to use
+-- citus_prepare_pg_upgrade. Until fixing that bug, let's create public
+-- schema here on all nodes.
+CREATE SCHEMA IF NOT EXISTS public;
+
+-- Do "SELECT 1" to hide port numbers
+SELECT 1 FROM run_command_on_workers($$CREATE SCHEMA IF NOT EXISTS public$$);
+
 SHOW server_version \gset
 SELECT substring(:'server_version', '\d+')::int > 11 AS server_version_above_eleven
 \gset
@@ -5,6 +23,18 @@ SELECT substring(:'server_version', '\d+')::int > 11 AS server_version_above_ele
 \else
 \q
 \endif
+
+-- create a columnar table within citus_schema
+CREATE TABLE new_columnar_table (
+  col_1 character varying(100),
+  col_2 date,
+  col_3 character varying(100),
+  col_4 date
+) USING columnar;
+
+INSERT INTO new_columnar_table
+SELECT ('1', '1999-01-01'::timestamp, '1', '1999-01-01'::timestamp)
+FROM generate_series(1, 1000);
 
 CREATE SCHEMA upgrade_columnar;
 SET search_path TO upgrade_columnar, public;
@@ -109,4 +139,3 @@ SELECT alter_columnar_table_set('test_options_2', stripe_row_limit => 6000);
 SELECT alter_columnar_table_set('test_options_2', compression => 'none');
 SELECT alter_columnar_table_set('test_options_2', compression_level => 13);
 INSERT INTO test_options_2 SELECT i, floor(i/2000) FROM generate_series(1, 10000) i;
-

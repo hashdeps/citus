@@ -1,3 +1,23 @@
+-- To avoid adding another alternative output for upgrade_list_citus_objects,
+-- let's run following three DDL's regardless of which postgres version we
+-- are using.
+-- Test if relying on topological sort of the objects, not their names, works
+-- fine where re-creating objects during pg_upgrade.
+ALTER SCHEMA public RENAME TO citus_schema;
+SET search_path TO citus_schema;
+-- As mentioned in https://github.com/citusdata/citus/issues/5447, it
+-- is essential to already have public schema to be able to use
+-- citus_prepare_pg_upgrade. Until fixing that bug, let's create public
+-- schema here on all nodes.
+CREATE SCHEMA IF NOT EXISTS public;
+-- Do "SELECT 1" to hide port numbers
+SELECT 1 FROM run_command_on_workers($$CREATE SCHEMA IF NOT EXISTS public$$);
+ ?column?
+---------------------------------------------------------------------
+        1
+        1
+(2 rows)
+
 SHOW server_version \gset
 SELECT substring(:'server_version', '\d+')::int > 11 AS server_version_above_eleven
 \gset
