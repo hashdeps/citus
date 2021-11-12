@@ -295,6 +295,54 @@ ALTER EXTENSION citus UPDATE TO '9.5-1';
 ALTER EXTENSION citus UPDATE TO '10.0-4';
 SELECT * FROM multi_extension.print_extension_changes();
 
+-- Test downgrade to 10.0-4 from 10.0-5
+ALTER EXTENSION citus UPDATE TO '10.0-5';
+ALTER EXTENSION citus UPDATE TO '10.0-4';
+-- Should be empty result since upgrade+downgrade should be a no-op
+SELECT * FROM multi_extension.print_extension_changes();
+
+-- Make sure that we don't delete pg_depend entries added in
+-- columnar--10.0-4--10.0-5.sql when downgrading to 10.0-4.
+SELECT COUNT(*)=9
+FROM pg_depend
+WHERE classid = 'pg_am'::regclass::oid AND
+      objid = (select oid from pg_am where amname = 'columnar') AND
+      objsubid = 0 AND
+      refclassid = 'pg_class'::regclass::oid AND
+      refobjsubid = 0 AND
+      deptype = 'n';
+
+-- Snapshot of state at 10.0-5
+ALTER EXTENSION citus UPDATE TO '10.0-5';
+SELECT * FROM multi_extension.print_extension_changes();
+
+-- Make sure that we defined dependencies from all rel objects (tables,
+-- indexes, sequences ..) to columnar table access method ...
+SELECT pg_class.oid INTO columnar_schema_members
+FROM pg_class, pg_namespace
+WHERE pg_namespace.oid=pg_class.relnamespace AND
+      pg_namespace.nspname='columnar';
+SELECT refobjid INTO columnar_schema_members_pg_depend
+FROM pg_depend
+WHERE classid = 'pg_am'::regclass::oid AND
+      objid = (select oid from pg_am where amname = 'columnar') AND
+      objsubid = 0 AND
+      refclassid = 'pg_class'::regclass::oid AND
+      refobjsubid = 0 AND
+      deptype = 'n';
+
+SELECT EXISTS
+(
+  -- ... , so this should be empty,
+  (TABLE columnar_schema_members EXCEPT TABLE columnar_schema_members_pg_depend)
+  UNION
+  (TABLE columnar_schema_members_pg_depend EXCEPT TABLE columnar_schema_members)
+);
+
+-- ... , and both columnar_schema_members_pg_depend & columnar_schema_members
+-- should have 9 entries.
+SELECT COUNT(*)=9 FROM columnar_schema_members_pg_depend;
+
 DROP TABLE multi_extension.prev_objects, multi_extension.extension_diff;
 
 -- show running version
