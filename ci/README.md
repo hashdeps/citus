@@ -297,9 +297,13 @@ See [#3115](https://github.com/citusdata/citus/pull/3115) for more info.
 
 We do not use comments starting with # in spec files because it creates errors
 from C preprocessor that expects directives after this character.
-Instead use SQL type comments, i.e:
+Instead use C type comments, i.e:
 ```
--- this is a comment
+// this is a single line comment
+
+/*
+ * this is a multi line comment
+ */
 ```
 
 ## `disallow_long_changelog_entries.sh`

@@ -9,4 +9,4 @@ source ci/ci_helpers.sh
 # preprocessor that expects directives after this character.
 
 # `# ` -> `-- `
-find src/test/regress/spec/*.spec -print0 | xargs -0 sed -i 's/# /-- /g'
+find src/test/regress/spec/*.spec -print0 | xargs -0 sed -i 's!# !// !g'
